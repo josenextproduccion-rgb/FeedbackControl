@@ -1,0 +1,67 @@
+
+name: Build Feedback Control VST3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-vst3:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows-x64
+            os: windows-latest
+          - name: macOS-Universal
+            os: macos-14
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Set up CMake
+        uses: lukka/get-cmake@v3.30.3
+
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build -A x64
+
+      - name: Configure macOS
+        if: runner.os == 'macOS'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target FeedbackControl_VST3 --parallel 2
+
+      - name: Package plugin
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLUGIN="$(find build -type d -name '*.vst3' -print -quit)"
+          if [[ -z "$PLUGIN" ]]; then
+            echo "VST3 bundle not found"
+            exit 1
+          fi
+          mkdir -p dist
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            ditto "$PLUGIN" "dist/Feedback Control.vst3"
+            ditto -c -k --sequesterRsrc --keepParent "dist/Feedback Control.vst3" FeedbackControl-VST3.zip
+          else
+            cp -R "$PLUGIN" "dist/Feedback Control.vst3"
+            cd dist
+            7z a ../FeedbackControl-VST3.zip "Feedback Control.vst3"
+          fi
+
+      - name: Upload compiled plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: FeedbackControl-${{ matrix.name }}
+          path: FeedbackControl-VST3.zip
+          if-no-files-found: error

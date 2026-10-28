@@ -28,10 +28,13 @@ jobs:
 
       - name: Set up CMake
         uses: lukka/get-cmake@v3.30.3
-
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        
       - name: Configure Windows
         if: runner.os == 'Windows'
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B build -G Ninja
 
       - name: Configure macOS
         if: runner.os == 'macOS'
